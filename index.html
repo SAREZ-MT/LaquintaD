@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>La Quinta · Control de despachos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <!-- Barra lateral -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">LQ</div>
+      <div><strong>La Quinta</strong><span>Distribuidora S.A.S.</span></div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item activo" data-vista="registro">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Registro de despacho
+      </button>
+      <button class="nav-item" data-vista="historial">
+        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>Historial de movimientos
+      </button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="conexion" id="estado-conexion"><span class="punto"></span><span>Comprobando configuración…</span></div>
+      <p>Bodega Cali · Seminario de Actualización 2026-2</p>
+    </div>
+  </aside>
+
+  <div class="contenido">
+    <header class="topbar">
+      <div>
+        <p class="migas" id="migas">Despachos</p>
+        <h1 id="titulo-vista">Registro de despacho</h1>
+      </div>
+      <div class="reloj"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="reloj">—</span></div>
+    </header>
+
+    <main>
+      <!-- ============ Vista 1: Registro ============ -->
+      <section id="vista-registro" class="vista activa">
+        <div class="layout-registro">
+          <form id="form-despacho" class="card" novalidate>
+            <div class="card-head">
+              <div class="icono-head azul"><svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg></div>
+              <div><h2>Nuevo despacho</h2><p>El sistema consulta el inventario, calcula el saldo y decide.</p></div>
+            </div>
+
+            <fieldset>
+              <legend>Quién solicita</legend>
+              <div class="fila-2">
+                <label class="campo">Solicitante<input name="solicitante" required placeholder="Nombre completo" autocomplete="name"></label>
+                <label class="campo">Correo<input name="correo" type="email" required placeholder="nombre@restaurante.com" autocomplete="email"></label>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Qué sale de bodega</legend>
+              <label class="campo">Código de producto
+                <select name="codigo_select" id="codigo_select" required>
+                  <option value="">Seleccione un producto…</option>
+                  <option value="__otro">Otro código (escribir)…</option>
+                </select>
+              </label>
+              <label class="campo" id="campo-otro" hidden>Escriba el código<input name="codigo_otro" placeholder="INS-0000" autocapitalize="characters"></label>
+
+              <div class="producto-info" id="producto-info" hidden>
+                <div class="pi-nombre"><strong id="pi-nombre"></strong><span id="pi-unidad"></span></div>
+                <div class="pi-stats">
+                  <div><span>Existencias</span><b id="pi-exist">—</b></div>
+                  <div><span>Mínimo</span><b id="pi-min">—</b></div>
+                  <div><span>Saldo estimado</span><b id="pi-saldo">—</b></div>
+                </div>
+                <div class="barra-stock"><div id="pi-barra"></div><i id="pi-marca"></i></div>
+                <p class="pi-nota">Referencia visual. La decisión la toma el escenario de Make con el inventario real.</p>
+              </div>
+
+              <div class="fila-2">
+                <label class="campo">Cantidad<input name="cantidad" type="number" min="1" step="1" required placeholder="0" inputmode="numeric"></label>
+                <label class="campo">Destino<input name="destino" required placeholder="Restaurante o sede"></label>
+              </div>
+              <div class="campo">Motivo
+                <div class="segmentado" role="radiogroup">
+                  <label><input type="radio" name="motivo" value="despacho" required><span>Despacho</span></label>
+                  <label><input type="radio" name="motivo" value="traslado entre sedes"><span>Traslado entre sedes</span></label>
+                  <label><input type="radio" name="motivo" value="avería"><span>Avería</span></label>
+                </div>
+              </div>
+            </fieldset>
+
+            <p id="error-form" class="alerta-error" hidden></p>
+            <button type="submit" id="btn-registrar" class="btn-primario">
+              <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>Registrar despacho</span>
+            </button>
+          </form>
+
+          <div class="col-derecha">
+            <div id="resultado" class="card resultado vacio">
+              <div class="vacio-ilustracion">
+                <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>
+              </div>
+              <h3>Respuesta del proceso</h3>
+              <p>Registre un despacho y aquí verá la decisión de Make: aprobado, con alerta, rechazado o ruta de respaldo.</p>
+              <ol class="pasos" id="pasos">
+                <li data-paso="1">Solicitud recibida</li>
+                <li data-paso="2">Consulta del inventario</li>
+                <li data-paso="3">Cálculo del saldo</li>
+                <li data-paso="4">Decisión</li>
+              </ol>
+            </div>
+
+            <div class="card">
+              <div class="card-head compacto"><h3>Solicitudes de esta sesión</h3><span class="contador" id="contador">0</span></div>
+              <ul id="bitacora" class="bitacora"><li class="vacio-txt">Aún no hay solicitudes.</li></ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ Vista 2: Historial ============ -->
+      <section id="vista-historial" class="vista">
+        <div class="kpis">
+          <div class="card kpi">
+            <div class="kpi-icono azul"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg></div>
+            <div><span class="kpi-nombre">I1 · Tiempo de respuesta</span><b id="kpi-i1">—</b><small>promedio(fecha_hora_respuesta − fecha_hora_solicitud) · meta &lt; 1 min</small></div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-icono ambar"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg></div>
+            <div><span class="kpi-nombre">I2 · Despachos bajo mínimo</span><b id="kpi-i2">—</b><small>APROBADO_ALERTA ÷ aprobados × 100</small></div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-icono verde"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15v-4M12 15V8M16 15v-6"/></svg></div>
+            <div><span class="kpi-nombre">Movimientos</span><b id="kpi-total">—</b><small id="kpi-desglose">filas en la tabla movimientos</small></div>
+          </div>
+          <div class="card kpi">
+            <div class="kpi-icono gris"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg></div>
+            <div><span class="kpi-nombre">Incidentes</span><b id="kpi-inc">—</b><small>solicitudes en ruta de respaldo</small></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="toolbar">
+            <div class="tabs" role="tablist">
+              <button class="tab activo" data-tabla="movimientos">Movimientos</button>
+              <button class="tab" data-tabla="inventario">Inventario actual</button>
+              <button class="tab" data-tabla="incidentes">Incidentes</button>
+            </div>
+            <div class="acciones">
+              <div class="buscar"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="buscar" placeholder="Buscar…"></div>
+              <select id="filtro-resultado" aria-label="Filtrar por resultado">
+                <option value="">Todos</option>
+                <option value="APROBADO">Aprobado</option>
+                <option value="APROBADO_ALERTA">Con alerta</option>
+              </select>
+              <button id="btn-actualizar" class="btn-sec"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>Actualizar</button>
+            </div>
+          </div>
+          <p id="estado-tabla" class="estado-tabla"></p>
+          <div id="contenedor-inventario" class="grid-inventario" hidden></div>
+          <div class="tabla-scroll" id="contenedor-tabla"><table id="tabla"><thead></thead><tbody></tbody></table></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+<div id="toast" class="toast" hidden></div>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
