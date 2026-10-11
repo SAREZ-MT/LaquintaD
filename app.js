@@ -22,7 +22,7 @@
 
   const ETIQUETAS = {
     APROBADO: "APROBADO", APROBADO_ALERTA: "APROBADO CON ALERTA", RECHAZADO: "RECHAZADO",
-    NO_VALIDO: "NO VÁLIDO · RUTA DE RESPALDO", SIN_RESPUESTA: "SIN RESPUESTA DEL PROCESO",
+    NO_VALIDO: "NO VÁLIDO", SIN_RESPUESTA: "SIN RESPUESTA",
   };
   const ICONOS = {
     APROBADO: '<path d="M5 12l5 5L20 7"/>',
@@ -192,33 +192,98 @@
       form.reset(); $("#campo-otro").hidden = true;
       form.solicitante.value = quien.solicitante; form.correo.value = quien.correo; // conserva quién pide
       cache = {}; refrescarInventario(); pintarProducto();
-      toast("Solicitud procesada: " + (ETIQUETAS[resp.resultado] || resp.resultado));
+      toast(textoParaSolicitante(datos, resp).titulo);
     }
   });
+
+  // Mensaje para quien pide: qué pasó con su pedido y qué sigue, en palabras sencillas.
+  function unidades(n, codigo) {
+    const p = CATALOGO.find((x) => x.codigo === codigo);
+    const u = p ? p.unidad : "unidad";
+    return `${n} ${Number(n) === 1 ? u : u + (/[aeiou]$/.test(u) ? "s" : "es")}`;
+  }
+  function textoParaSolicitante(d, r) {
+    const cod = r.codigo || d.codigo_producto;
+    const prod = r.producto || cod;
+    const pedidas = r.cantidad ?? d.cantidad;
+    const nombre = String(d.solicitante || "").trim().split(/\s+/)[0];
+    const hola = nombre ? `${nombre}, ` : "";
+    switch (r.resultado) {
+      case "APROBADO":
+        return {
+          titulo: "¡Tu pedido va en camino!",
+          texto: `${hola}aprobamos ${unidades(pedidas, cod)} de ${prod} para ${d.destino}.`,
+          sigue: ["La bodega ya lo tiene asignado y lo alista para el despacho.",
+                  r.id_movimiento ? `Guarda tu número de pedido: ${r.id_movimiento}.` : "Tu pedido quedó registrado."],
+        };
+      case "APROBADO_ALERTA":
+        return {
+          titulo: "¡Tu pedido va en camino!",
+          texto: `${hola}aprobamos ${unidades(pedidas, cod)} de ${prod} para ${d.destino}.`,
+          aviso: Number(r.saldo_despues) === 0
+            ? "Con tu pedido se acabó este producto en bodega. Ya avisamos a Compras para que lo reponga."
+            : `Este producto está quedando escaso: quedan ${unidades(r.saldo_despues, cod)}. Ya avisamos a Compras para que lo reponga.`,
+          sigue: ["Tu pedido no se ve afectado: se despacha completo.",
+                  r.id_movimiento ? `Guarda tu número de pedido: ${r.id_movimiento}.` : "Tu pedido quedó registrado."],
+        };
+      case "RECHAZADO": {
+        const hay = Number(r.existencias_antes);
+        return {
+          titulo: "No hay suficiente producto para tu pedido",
+          texto: `${hola}pediste ${unidades(pedidas, cod)} de ${prod}, pero ${hay > 0 ? `hoy solo hay ${unidades(hay, cod)} en bodega` : "hoy no hay unidades en bodega"}.`,
+          aviso: "No se despachó nada y no se descontó nada del inventario.",
+          sigue: ["Ya avisamos a Compras para que reponga este producto.",
+                  hay > 0 ? `Si te sirve, puedes pedir hasta ${unidades(hay, cod)} ahora, o esperar la reposición.` : "Puedes volver a pedirlo cuando se reponga."],
+        };
+      }
+      case "NO_VALIDO":
+        return {
+          titulo: "No pudimos procesar tu pedido",
+          texto: `${hola}el código ${cod} no aparece en nuestro catálogo, o la cantidad no es válida.`,
+          sigue: ["Revisa el código en la lista de productos y vuelve a intentarlo.",
+                  "Dejamos registro del caso para que el equipo lo revise."],
+        };
+      default:
+        return {
+          titulo: "No recibimos respuesta del sistema",
+          texto: "Tu pedido no quedó confirmado.",
+          sigue: ["Intenta de nuevo en unos minutos.", "Si vuelve a pasar, avisa al administrador del sistema."],
+          tecnico: r.mensaje,
+        };
+    }
+  }
 
   function mostrarResultado(d, r) {
     const el = $("#resultado");
     el.className = "card resultado r-" + r.resultado;
+    const m = textoParaSolicitante(d, r);
     const tieneSaldo = r.existencias_antes !== undefined && r.saldo_despues !== undefined;
     el.innerHTML = `
       <div class="res-icono"><svg viewBox="0 0 24 24">${ICONOS[r.resultado] || ICONOS.NO_VALIDO}</svg></div>
       <span class="res-estado">${esc(ETIQUETAS[r.resultado] || r.resultado)}</span>
-      <p class="res-mensaje">${esc(r.mensaje)}</p>
-      ${tieneSaldo ? `
+      <h3 class="res-titulo">${esc(m.titulo)}</h3>
+      <p class="res-mensaje">${esc(m.texto)}</p>
+      ${m.aviso ? `<p class="res-aviso">${esc(m.aviso)}</p>` : ""}
+      <div class="res-sigue"><b>¿Qué sigue?</b><ul>${m.sigue.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
+      <details class="res-detalle">
+        <summary>Ver detalle del pedido</summary>
+        ${tieneSaldo ? `
         <div class="ecuacion">
           <div><small>Existencias</small><b>${esc(r.existencias_antes)}</b></div><div class="op">−</div>
           <div><small>Cantidad</small><b>${esc(r.cantidad ?? d.cantidad)}</b></div><div class="op">=</div>
           <div class="saldo"><small>Saldo</small><b>${esc(r.saldo_despues)}</b></div>
         </div>
         <p class="minimo-txt">Mínimo de reposición: <b>${esc(r.minimo)}</b></p>` : ""}
-      <dl class="res-datos">
-        <dt>Producto</dt><dd>${esc(r.producto || "—")} · ${esc(r.codigo || d.codigo_producto)}</dd>
-        <dt>Destino</dt><dd>${esc(d.destino)} · ${esc(d.motivo)}</dd>
-        <dt>Solicitante</dt><dd>${esc(d.solicitante)}</dd>
-        ${r.id_movimiento ? `<dt>Movimiento</dt><dd>${esc(r.id_movimiento)}</dd>` : ""}
-        <dt>Solicitud</dt><dd>${esc(d.fecha_hora_solicitud)}</dd>
-        ${r.fecha_hora_respuesta ? `<dt>Respuesta</dt><dd>${esc(r.fecha_hora_respuesta)}</dd>` : ""}
-      </dl>`;
+        <dl class="res-datos">
+          <dt>Producto</dt><dd>${esc(r.producto || "—")} · ${esc(r.codigo || d.codigo_producto)}</dd>
+          <dt>Destino</dt><dd>${esc(d.destino)} · ${esc(d.motivo)}</dd>
+          <dt>Solicitante</dt><dd>${esc(d.solicitante)}</dd>
+          ${r.id_movimiento ? `<dt>Pedido</dt><dd>${esc(r.id_movimiento)}</dd>` : ""}
+          <dt>Solicitud</dt><dd>${esc(d.fecha_hora_solicitud)}</dd>
+          ${r.fecha_hora_respuesta ? `<dt>Respuesta</dt><dd>${esc(r.fecha_hora_respuesta)}</dd>` : ""}
+          ${m.tecnico ? `<dt>Detalle técnico</dt><dd>${esc(m.tecnico)}</dd>` : ""}
+        </dl>
+      </details>`;
   }
 
   let enSesion = 0;
