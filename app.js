@@ -71,9 +71,7 @@
 
   let inventarioVivo = null; // filas de la hoja «inventario», si se pudo leer
   async function refrescarInventario() {
-    if (!configurado(CFG.SHEET_ID)) return;
-    try { inventarioVivo = await leerHoja("inventario"); } catch { inventarioVivo = null; }
-    pintarProducto();
+    pintarProducto(); // la vista de registro ya no muestra existencias, así que no se consulta la hoja aquí
   }
 
   function productoActual() {
@@ -290,8 +288,29 @@
   $("#filtro-resultado").addEventListener("change", () => cargarTabla(true));
   $("#buscar").addEventListener("input", () => cargarTabla(true));
 
-  // Lee una hoja del libro como CSV. El libro debe estar compartido como «cualquier persona con el enlace puede ver».
+  // Lee las tablas a través del escenario «Consultar historial» de Make, así la hoja no tiene que ser pública.
+  // Una sola llamada trae las cuatro pestañas; se guarda en la caché hasta que se pulse «Actualizar».
+  async function leerLibro() {
+    if (cache.__libro) return cache.__libro;
+    cache.__libro = (async () => {
+      const r = await fetch(CFG.HISTORIAL_URL, { method: "POST", body: new URLSearchParams({ consulta: "historial" }) });
+      const texto = await r.text();
+      let datos;
+      try { datos = JSON.parse(texto); } catch { throw new Error("Make no devolvió los datos (respuesta: «" + texto.slice(0, 60) + "»). Revisa que el escenario «La Quinta - Consultar historial» esté activo"); }
+      const libro = {};
+      for (const vr of datos.valueRanges || []) {
+        const nombre = String(vr.range || "").split("!")[0].replace(/^'|'$/g, "");
+        const [enc = [], ...filas] = (vr.values || []).filter((f) => f.some((c) => String(c ?? "") !== ""));
+        libro[nombre] = filas.map((f) => Object.fromEntries(enc.map((h, i) => [String(h).trim(), f[i] ?? ""])));
+      }
+      return libro;
+    })();
+    try { return await cache.__libro; } catch (ex) { delete cache.__libro; throw ex; }
+  }
+
   async function leerHoja(nombre) {
+    if (configurado(CFG.HISTORIAL_URL)) return (await leerLibro())[nombre] || [];
+    // Alternativa: leer la hoja publicada como CSV (requiere «cualquier persona con el enlace puede ver»).
     const url = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(CFG.SHEET_ID)}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(nombre)}&t=${Date.now()}`;
     const r = await fetch(url);
     if (!r.ok) throw new Error("Google Sheets respondió " + r.status);
@@ -356,7 +375,7 @@
       pintarTabla(COLUMNAS[tablaActual], filas);
       estado.textContent = `${filas.length} fila(s) · más reciente primero · actualizado ${ahoraBogota().slice(11)}`;
     } catch (ex) {
-      estado.textContent = "No se pudo leer la hoja de Google Sheets (" + ex.message + "). Compártela en Google Sheets: Compartir → Acceso general → «Cualquier persona con el enlace» → Lector.";
+      estado.textContent = "No se pudo cargar el historial: " + ex.message + ".";
     }
   }
 
