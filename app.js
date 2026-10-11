@@ -54,7 +54,7 @@
   })();
 
   // ---------- Navegación ----------
-  const TITULOS = { registro: ["Despachos", "Registro de despacho"], historial: ["Trazabilidad", "Historial de movimientos"] };
+  const TITULOS = { registro: ["Pedidos", "Registro de pedido"], historial: ["Administración", "Historial de movimientos"] };
   $$(".nav-item").forEach((b) => b.addEventListener("click", () => {
     const v = b.dataset.vista;
     $$(".nav-item").forEach((t) => t.classList.toggle("activo", t === b));
@@ -97,16 +97,8 @@
     const p = productoActual(), caja = $("#producto-info");
     caja.hidden = !p;
     if (!p) return;
-    const cant = parseInt(form.cantidad.value, 10);
-    const saldo = Number.isFinite(cant) && cant > 0 ? p.existencias - cant : null;
     $("#pi-nombre").textContent = p.producto;
-    $("#pi-unidad").textContent = "Unidad: " + p.unidad + (p.vivo ? " · inventario en vivo" : " · datos de partida");
-    $("#pi-exist").textContent = p.existencias;
-    $("#pi-min").textContent = p.minimo;
-    const s = $("#pi-saldo");
-    s.textContent = saldo === null ? "—" : saldo;
-    s.className = saldo === null ? "" : saldo < 0 ? "neg" : saldo < p.minimo ? "bajo" : "ok";
-    pintarBarra($("#pi-barra"), $("#pi-marca"), p.existencias, p.minimo, saldo);
+    $("#pi-unidad").textContent = "Se pide por " + p.unidad;
   }
 
   selCodigo.addEventListener("change", () => {
@@ -148,8 +140,8 @@
     const el = $("#resultado");
     el.className = "card resultado vacio";
     el.innerHTML = `<div class="vacio-ilustracion"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></svg></div>
-      <h3>Procesando solicitud…</h3><p>Make está consultando el inventario y calculando el saldo.</p>
-      <ol class="pasos" id="pasos"><li>Solicitud recibida</li><li>Consulta del inventario</li><li>Cálculo del saldo</li><li>Decisión</li></ol>`;
+      <h3>Procesando tu pedido…</h3><p>Estamos verificando la disponibilidad.</p>
+      <ol class="pasos" id="pasos"><li>Pedido recibido</li><li>Verificando disponibilidad</li><li>Respuesta</li></ol>`;
     $(".vacio-ilustracion svg", el).style.animation = "girar 1s linear infinite";
     const lis = $$("#pasos li", el);
     lis.forEach((li, i) => timersPasos.push(setTimeout(() => {
@@ -168,7 +160,7 @@
 
     datos.fecha_hora_solicitud = ahoraBogota();
     const btn = $("#btn-registrar");
-    btn.disabled = true; btn.innerHTML = '<span class="spin"></span><span>Consultando inventario…</span>';
+    btn.disabled = true; btn.innerHTML = '<span class="spin"></span><span>Enviando pedido…</span>';
     animarPasos();
     let resp;
     try {
@@ -183,7 +175,7 @@
       resp = { resultado: "SIN_RESPUESTA", mensaje: "No se pudo contactar el webhook de Make: " + ex.message };
     } finally {
       timersPasos.forEach(clearTimeout); timersPasos = [];
-      btn.disabled = false; btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>Registrar despacho</span>';
+      btn.disabled = false; btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>Enviar pedido</span>';
     }
     mostrarResultado(datos, resp);
     agregarBitacora(datos, resp);
@@ -197,51 +189,37 @@
   });
 
   // Mensaje para quien pide: qué pasó con su pedido y qué sigue, en palabras sencillas.
-  function unidades(n, codigo) {
-    const p = CATALOGO.find((x) => x.codigo === codigo);
-    const u = p ? p.unidad : "unidad";
-    return `${n} ${Number(n) === 1 ? u : u + (/[aeiou]$/.test(u) ? "s" : "es")}`;
-  }
   function textoParaSolicitante(d, r) {
     const cod = r.codigo || d.codigo_producto;
-    const prod = r.producto || cod;
-    const pedidas = r.cantidad ?? d.cantidad;
     const nombre = String(d.solicitante || "").trim().split(/\s+/)[0];
     const hola = nombre ? `${nombre}, ` : "";
+    const guarda = r.id_movimiento ? `Guarda tu número de pedido: ${r.id_movimiento}.` : "Tu pedido quedó registrado.";
     switch (r.resultado) {
       case "APROBADO":
         return {
-          titulo: "¡Tu pedido va en camino!",
-          texto: `${hola}aprobamos ${unidades(pedidas, cod)} de ${prod} para ${d.destino}.`,
-          sigue: ["La bodega ya lo tiene asignado y lo alista para el despacho.",
-                  r.id_movimiento ? `Guarda tu número de pedido: ${r.id_movimiento}.` : "Tu pedido quedó registrado."],
+          titulo: "Tu pedido fue aprobado",
+          texto: `${hola}tu pedido se va a despachar completo.`,
+          sigue: ["La bodega lo alista y lo envía al destino que indicaste.", guarda],
         };
       case "APROBADO_ALERTA":
         return {
-          titulo: "¡Tu pedido va en camino!",
-          texto: `${hola}aprobamos ${unidades(pedidas, cod)} de ${prod} para ${d.destino}.`,
-          aviso: Number(r.saldo_despues) === 0
-            ? "Con tu pedido se acabó este producto en bodega. Ya avisamos a Compras para que lo reponga."
-            : `Este producto está quedando escaso: quedan ${unidades(r.saldo_despues, cod)}. Ya avisamos a Compras para que lo reponga.`,
-          sigue: ["Tu pedido no se ve afectado: se despacha completo.",
-                  r.id_movimiento ? `Guarda tu número de pedido: ${r.id_movimiento}.` : "Tu pedido quedó registrado."],
+          titulo: "Tu pedido fue aprobado",
+          texto: `${hola}tu pedido se va a despachar completo.`,
+          aviso: "Se aprobó con una alerta interna para el equipo de Compras. No tienes que hacer nada.",
+          sigue: ["La bodega lo alista y lo envía al destino que indicaste.", guarda],
         };
-      case "RECHAZADO": {
-        const hay = Number(r.existencias_antes);
+      case "RECHAZADO":
         return {
-          titulo: "No hay suficiente producto para tu pedido",
-          texto: `${hola}pediste ${unidades(pedidas, cod)} de ${prod}, pero ${hay > 0 ? `hoy solo hay ${unidades(hay, cod)} en bodega` : "hoy no hay unidades en bodega"}.`,
-          aviso: "No se despachó nada y no se descontó nada del inventario.",
-          sigue: ["Ya avisamos a Compras para que reponga este producto.",
-                  hay > 0 ? `Si te sirve, puedes pedir hasta ${unidades(hay, cod)} ahora, o esperar la reposición.` : "Puedes volver a pedirlo cuando se reponga."],
+          titulo: "Tu pedido fue rechazado",
+          texto: `${hola}en este momento no tenemos la cantidad que pediste de este producto.`,
+          aviso: "No se despachó nada.",
+          sigue: ["Puedes intentar con una cantidad menor o volver a pedirlo más tarde."],
         };
-      }
       case "NO_VALIDO":
         return {
           titulo: "No pudimos procesar tu pedido",
-          texto: `${hola}el código ${cod} no aparece en nuestro catálogo, o la cantidad no es válida.`,
-          sigue: ["Revisa el código en la lista de productos y vuelve a intentarlo.",
-                  "Dejamos registro del caso para que el equipo lo revise."],
+          texto: `${hola}el producto ${cod} no existe en nuestro catálogo, o la cantidad no es válida.`,
+          sigue: ["Revisa el código en la lista de productos y vuelve a intentarlo.", "Dejamos registro del caso para que el equipo lo revise."],
         };
       default:
         return {
@@ -257,7 +235,7 @@
     const el = $("#resultado");
     el.className = "card resultado r-" + r.resultado;
     const m = textoParaSolicitante(d, r);
-    const tieneSaldo = r.existencias_antes !== undefined && r.saldo_despues !== undefined;
+    const p = CATALOGO.find((x) => x.codigo === (r.codigo || d.codigo_producto));
     el.innerHTML = `
       <div class="res-icono"><svg viewBox="0 0 24 24">${ICONOS[r.resultado] || ICONOS.NO_VALIDO}</svg></div>
       <span class="res-estado">${esc(ETIQUETAS[r.resultado] || r.resultado)}</span>
@@ -265,25 +243,16 @@
       <p class="res-mensaje">${esc(m.texto)}</p>
       ${m.aviso ? `<p class="res-aviso">${esc(m.aviso)}</p>` : ""}
       <div class="res-sigue"><b>¿Qué sigue?</b><ul>${m.sigue.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
-      <details class="res-detalle">
-        <summary>Ver detalle del pedido</summary>
-        ${tieneSaldo ? `
-        <div class="ecuacion">
-          <div><small>Existencias</small><b>${esc(r.existencias_antes)}</b></div><div class="op">−</div>
-          <div><small>Cantidad</small><b>${esc(r.cantidad ?? d.cantidad)}</b></div><div class="op">=</div>
-          <div class="saldo"><small>Saldo</small><b>${esc(r.saldo_despues)}</b></div>
-        </div>
-        <p class="minimo-txt">Mínimo de reposición: <b>${esc(r.minimo)}</b></p>` : ""}
-        <dl class="res-datos">
-          <dt>Producto</dt><dd>${esc(r.producto || "—")} · ${esc(r.codigo || d.codigo_producto)}</dd>
-          <dt>Destino</dt><dd>${esc(d.destino)} · ${esc(d.motivo)}</dd>
-          <dt>Solicitante</dt><dd>${esc(d.solicitante)}</dd>
-          ${r.id_movimiento ? `<dt>Pedido</dt><dd>${esc(r.id_movimiento)}</dd>` : ""}
-          <dt>Solicitud</dt><dd>${esc(d.fecha_hora_solicitud)}</dd>
-          ${r.fecha_hora_respuesta ? `<dt>Respuesta</dt><dd>${esc(r.fecha_hora_respuesta)}</dd>` : ""}
-          ${m.tecnico ? `<dt>Detalle técnico</dt><dd>${esc(m.tecnico)}</dd>` : ""}
-        </dl>
-      </details>`;
+      <dl class="res-datos">
+        ${r.id_movimiento ? `<dt>N.º de pedido</dt><dd>${esc(r.id_movimiento)}</dd>` : ""}
+        <dt>Producto</dt><dd>${(r.producto || p) ? esc(r.producto || p.producto) + " · " : ""}${esc(r.codigo || d.codigo_producto)}</dd>
+        <dt>Cantidad pedida</dt><dd>${esc(d.cantidad)}${p ? " " + esc(p.unidad) + (Number(d.cantidad) === 1 ? "" : "s") : ""}</dd>
+        <dt>Destino</dt><dd>${esc(d.destino)} · ${esc(d.motivo)}</dd>
+        <dt>Solicitante</dt><dd>${esc(d.solicitante)}</dd>
+        <dt>Enviado</dt><dd>${esc(d.fecha_hora_solicitud)}</dd>
+        ${r.fecha_hora_respuesta ? `<dt>Respondido</dt><dd>${esc(r.fecha_hora_respuesta)}</dd>` : ""}
+        ${m.tecnico ? `<dt>Detalle técnico</dt><dd>${esc(m.tecnico)}</dd>` : ""}
+      </dl>`;
   }
 
   let enSesion = 0;
@@ -341,6 +310,7 @@
 
   const COLUMNAS = {
     movimientos: ["id_movimiento", "fecha_hora_solicitud", "fecha_hora_respuesta", "solicitante", "correo", "codigo_producto", "producto", "cantidad", "existencias_antes", "saldo_despues", "minimo", "destino", "motivo", "resultado"],
+    alertas_compras: ["fecha_hora", "id_movimiento", "codigo_producto", "producto", "saldo_despues", "minimo", "destino", "mensaje"],
     incidentes: ["id_incidente", "fecha_hora_solicitud", "fecha_hora_respuesta", "solicitante", "correo", "codigo_producto", "cantidad", "destino", "motivo", "tipo", "detalle"],
   };
   const NUMERICAS = new Set(["cantidad", "existencias_antes", "saldo_despues", "minimo", "existencias"]);
@@ -366,7 +336,7 @@
         return;
       }
       $("#contenedor-tabla").hidden = false; $("#contenedor-inventario").hidden = true;
-      let filas = (tablaActual === "movimientos" ? movs : incs).filter(coincide);
+      let filas = (tablaActual === "movimientos" ? movs : tablaActual === "incidentes" ? incs : await obtener(tablaActual)).filter(coincide);
       const f = $("#filtro-resultado").value;
       if (tablaActual === "movimientos" && f) filas = filas.filter((r) => r.resultado === f);
       filas = [...filas].reverse(); // lo más reciente primero

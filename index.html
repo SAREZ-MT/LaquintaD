@@ -19,10 +19,10 @@
     </div>
     <nav class="nav">
       <button class="nav-item activo" data-vista="registro">
-        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Registro de despacho
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Registro de pedido
       </button>
       <button class="nav-item" data-vista="historial">
-        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>Historial de movimientos
+        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>Historial (administrador)
       </button>
     </nav>
     <div class="sidebar-foot">
@@ -47,7 +47,7 @@
           <form id="form-despacho" class="card" novalidate>
             <div class="card-head">
               <div class="icono-head azul"><svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg></div>
-              <div><h2>Nuevo despacho</h2><p>El sistema consulta el inventario, calcula el saldo y decide.</p></div>
+              <div><h2>Nuevo pedido</h2><p>Llena los datos y te respondemos al instante si tu pedido sale o no.</p></div>
             </div>
 
             <fieldset>
@@ -70,13 +70,6 @@
 
               <div class="producto-info" id="producto-info" hidden>
                 <div class="pi-nombre"><strong id="pi-nombre"></strong><span id="pi-unidad"></span></div>
-                <div class="pi-stats">
-                  <div><span>Existencias</span><b id="pi-exist">—</b></div>
-                  <div><span>Mínimo</span><b id="pi-min">—</b></div>
-                  <div><span>Saldo estimado</span><b id="pi-saldo">—</b></div>
-                </div>
-                <div class="barra-stock"><div id="pi-barra"></div><i id="pi-marca"></i></div>
-                <p class="pi-nota">Referencia visual. La decisión la toma el escenario de Make con el inventario real.</p>
               </div>
 
               <div class="fila-2">
@@ -94,7 +87,7 @@
 
             <p id="error-form" class="alerta-error" hidden></p>
             <button type="submit" id="btn-registrar" class="btn-primario">
-              <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>Registrar despacho</span>
+              <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>Enviar pedido</span>
             </button>
           </form>
 
@@ -103,18 +96,17 @@
               <div class="vacio-ilustracion">
                 <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>
               </div>
-              <h3>Respuesta del proceso</h3>
-              <p>Registre un despacho y aquí verá la decisión de Make: aprobado, con alerta, rechazado o ruta de respaldo.</p>
+              <h3>Respuesta a tu pedido</h3>
+              <p>Cuando envíes tu pedido, aquí verás la respuesta: aprobado, aprobado con alerta, rechazado o no procesado.</p>
               <ol class="pasos" id="pasos">
-                <li data-paso="1">Solicitud recibida</li>
-                <li data-paso="2">Consulta del inventario</li>
-                <li data-paso="3">Cálculo del saldo</li>
-                <li data-paso="4">Decisión</li>
+                <li data-paso="1">Pedido recibido</li>
+                <li data-paso="2">Verificando disponibilidad</li>
+                <li data-paso="3">Respuesta</li>
               </ol>
             </div>
 
             <div class="card">
-              <div class="card-head compacto"><h3>Solicitudes de esta sesión</h3><span class="contador" id="contador">0</span></div>
+              <div class="card-head compacto"><h3>Tus pedidos de esta sesión</h3><span class="contador" id="contador">0</span></div>
               <ul id="bitacora" class="bitacora"><li class="vacio-txt">Aún no hay solicitudes.</li></ul>
             </div>
           </div>
@@ -147,6 +139,7 @@
             <div class="tabs" role="tablist">
               <button class="tab activo" data-tabla="movimientos">Movimientos</button>
               <button class="tab" data-tabla="inventario">Inventario actual</button>
+              <button class="tab" data-tabla="alertas_compras">Alertas a Compras</button>
               <button class="tab" data-tabla="incidentes">Incidentes</button>
             </div>
             <div class="acciones">
