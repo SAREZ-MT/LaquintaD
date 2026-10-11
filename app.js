@@ -208,13 +208,24 @@
           aviso: "Se aprobó con una alerta interna para el equipo de Compras. No tienes que hacer nada.",
           sigue: ["La bodega lo alista y lo envía al destino que indicaste.", guarda],
         };
-      case "RECHAZADO":
+      case "RECHAZADO": {
+        const p = CATALOGO.find((x) => x.codigo === cod);
+        const u = (n) => `${n} ${p ? (Number(n) === 1 ? p.unidad : p.unidad + "s") : "unidades"}`;
+        const hay = Number(r.existencias_antes);
+        const conDatos = Number.isFinite(hay);
         return {
           titulo: "Tu pedido fue rechazado",
-          texto: `${hola}en este momento no tenemos la cantidad que pediste de este producto.`,
-          aviso: "No se despachó nada.",
-          sigue: ["Puedes intentar con una cantidad menor o volver a pedirlo más tarde."],
+          texto: conDatos
+            ? `${hola}la cantidad que pediste (${u(r.cantidad ?? d.cantidad)}) es mayor a la que hay en existencia.`
+            : `${hola}en este momento no tenemos la cantidad que pediste de este producto.`,
+          aviso: conDatos
+            ? (hay > 0 ? `Disponibles en bodega: ${u(hay)}. No se despachó nada.` : "No hay unidades disponibles en bodega. No se despachó nada.")
+            : "No se despachó nada.",
+          sigue: conDatos && hay > 0
+            ? [`Puedes hacer un nuevo pedido por ${u(hay)} o menos.`, "O vuelve a pedirlo cuando el producto se reponga."]
+            : ["Vuelve a pedirlo cuando el producto se reponga."],
         };
+      }
       case "NO_VALIDO":
         return {
           titulo: "No pudimos procesar tu pedido",
@@ -284,7 +295,9 @@
     const url = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(CFG.SHEET_ID)}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(nombre)}&t=${Date.now()}`;
     const r = await fetch(url);
     if (!r.ok) throw new Error("Google Sheets respondió " + r.status);
-    const filas = parseCSV(await r.text()).filter((f) => f.some((c) => c !== ""));
+    const texto = await r.text();
+    if (/^\s*</.test(texto)) throw new Error("la hoja no es pública");
+    const filas = parseCSV(texto).filter((f) => f.some((c) => c !== ""));
     const [enc = [], ...datos] = filas;
     return datos.map((f) => Object.fromEntries(enc.map((h, i) => [h.trim(), f[i] ?? ""])));
   }
@@ -343,7 +356,7 @@
       pintarTabla(COLUMNAS[tablaActual], filas);
       estado.textContent = `${filas.length} fila(s) · más reciente primero · actualizado ${ahoraBogota().slice(11)}`;
     } catch (ex) {
-      estado.textContent = "No se pudo leer la hoja: " + ex.message + ". Verifique que esté compartida para lectura con el enlace.";
+      estado.textContent = "No se pudo leer la hoja de Google Sheets (" + ex.message + "). Compártela en Google Sheets: Compartir → Acceso general → «Cualquier persona con el enlace» → Lector.";
     }
   }
 
